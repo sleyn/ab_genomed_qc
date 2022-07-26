@@ -1,0 +1,154 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+To do variant calling we need to be sure that genomes have a good assembly quality in terms of nucleotide quality.
+To test it we will extract some single copy genes and test their distance.
+
+```{r setup}
+library(seqinr)
+library(kmer)
+library(tibble)
+library(data.table)
+library(dtplyr)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+library(ggExtra)
+library(tidyr)
+library(readr)
+library(stringr)
+```
+
+Load MAFFT alignment and calculate distance matrix.
+
+```{r distance_matrix}
+aln = read.alignment('data/Universal_genes/GyrA/PGF_03272313.aln', 'fasta')
+dist_matrix = dist.alignment(aln, 'identity')
+```
+
+```{r kmer distance_matrix}
+fasta = ape::read.FASTA(file = "data/Universal_genes/GyrA/PGF_03272313.fasta",type="AA")
+dend = kmer::cluster(fasta, 10)
+kmer_distances = ape::cophenetic.phylo(
+  ape::as.phylo(dend)
+  )
+```
+
+```{r visualize_dist_matrix, eval=F, include=F}
+distances = as.matrix(dist_matrix)
+
+# Remove duplicates from the matrix by removing its upper triangle with diagonal
+distances[upper.tri(distances, diag = T)] <- -1
+protein_id_1 = rownames(distances)
+genome_id_1 = str_remove(protein_id_1, '.peg.\\d+')
+genome_id_1 = str_remove(genome_id_1, 'fig\\|')
+
+# get ready for data.table processing
+distances = lazy_dt(distances)
+
+# create tibble
+distances = as_tibble(distances) %>% 
+  mutate(Protein1 = protein_id_1, Genome1 = genome_id_1) %>% 
+  pivot_longer(-c('Protein1', 'Genome1'), names_to = 'Protein2', values_to = 'Distance') %>% 
+  filter(Distance >= 0) %>% 
+  mutate(Genome2 = str_remove(Protein2, '.peg.\\d+')) %>% 
+  mutate(Genome2 = str_remove(Genome2, 'fig\\|'))
+
+# write intermediate results as calculation take a lot of time
+distances %>% as_tibble() %>%  write_tsv('distances_table_temp.tsv')
+
+rm(protein_id_1)
+rm(genome_id_1)
+
+# Choose only best hit for pair of genomes in case they have multiple marker genes (e.g. due to contamination)
+distances = distances %>% 
+  arrange(Distance) %>% 
+  group_by(Genome1, Genome2) %>%
+  filter(row_number() == 1)
+
+distances_count = distances %>% ungroup() %>% mutate(Distance = round(Distance, 2)) %>% count(Distance) %>% as_tibble()
+
+# Check distribution of distances
+distances_count %>% ggplot(aes(Distance, n)) + 
+  geom_bar(stat = "identity") +
+  scale_y_continuous(trans = 'sqrt')
+```
+
+Calculate distantces between genomes based on the distance matrix and look on the outliers.
+Let's choose reference fig|1310607.3.peg.2982. It is the same sequence as in our reference *A. baumannii* ATCC 17978
+```{r visualize outliers, echo=T, include=T}
+# length of the reference protein
+ref_len = 904
+ref = 'fig|1310607.3.peg.2982'
+
+distances_mtx = as.matrix(dist_matrix)
+target_dist = distances_mtx[ref,]
+ggplot(tibble(Distance = target_dist ^ 2), aes(Distance)) + geom_histogram(binwidth = 0.01) + ggtitle('Distribution of distances > 0')
+```
+
+
+```{r select outliers}
+distances = tibble(
+  Distance = target_dist,
+  Protein = names(target_dist)
+) %>% 
+  mutate(Genome = str_match(Protein, 'fig\\|(\\d+\\.\\d+)\\.')[,2])
+
+distances %>% write_tsv('./output/target_dist_test.tsv')
+
+n_contaminated = distances %>% 
+  group_by(Genome) %>% 
+  summarize(n = n()) %>% 
+  filter(n>1) %>% 
+  nrow()
+
+# leave only one protein per genome - closest to the reference
+distances_best = distances %>% 
+  arrange(Distance) %>%
+  group_by(Genome) %>% 
+  filter(row_number() == 1)
+
+# Take genomes with 
+distances_best %>% 
+  mutate(Distance = Distance ^ 2, Approx_AA_diff = Distance * ref_len) %>% 
+  filter(Approx_AA_diff > 10) %>% 
+  pull(Genome)
+```
+`r n_contaminated` genomes have more than one copy of gene.
+
+```{r kmer_mse_compare}
+kmer_distances_tbl = tibble(
+  Distance = kmer_distances[ref,],
+  Protein = names(kmer_distances[ref,])
+  ) %>% 
+  mutate(Genome = str_match(Protein, 'fig\\|(\\d+\\.\\d+)\\.')[,2]) %>% 
+  arrange(Distance) %>%
+  group_by(Genome) %>% 
+  filter(row_number() == 1)
+
+kmer_distances_tbl_10 = kmer_distances_tbl
+
+dist_compare = kmer_distances_tbl_3 %>% 
+  ungroup() %>% 
+  rename(Kmer_dist_3 = Distance) %>% 
+  select(-Protein) %>% 
+  full_join(kmer_distances_tbl_5 %>% ungroup() %>%  rename(Kmer_dist_5 = Distance) %>% select(-Protein), by = "Genome") %>%
+  full_join(kmer_distances_tbl_6 %>% ungroup() %>%  rename(Kmer_dist_6 = Distance) %>% select(-Protein), by = "Genome") %>%
+  full_join(kmer_distances_tbl_6_ns10 %>% ungroup() %>%  rename(Kmer_dist_6ns10 = Distance) %>% select(-Protein), by = "Genome") %>%
+  full_join(kmer_distances_tbl_10 %>% ungroup() %>%  rename(Kmer_dist_10 = Distance) %>% select(-Protein), by = "Genome") %>%
+  full_join(distances_best %>% ungroup() %>%  rename(MSE_dist = Distance) %>% select(-Protein), by = "Genome") %>% 
+  pivot_longer(-c(MSE_dist, Genome), names_to = 'Kmer_size', values_to = 'Kmer_dist')
+
+dist_compare %>% write_tsv('./output/kmer_mse_compare.tsv')
+
+dist_compare %>% filter(Kmer_size %in% c('Kmer_dist_6', 'Kmer_dist_6ns10')) %>%  ggplot(aes(Kmer_dist, MSE_dist, color = Kmer_size)) + 
+  geom_jitter(alpha = 0.1, height = 0.01, width = 0.01) + 
+  geom_abline(intercept = 0, slope = 1) +
+  theme_minimal()
+
+# dist_compare %>% filter(is.na(Kmer_dist))
+# dist_compare %>% filter(MSE_dist < 0.01, Kmer_dist> 0.3)
+# 
+# kmer_distances_tbl %>% filter(Protein == 'fig|1310572.3.peg.4207')
+```
