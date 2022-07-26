@@ -17,3 +17,13 @@ options:
   --ref_sequence REF_SEQUENCE
                         If specified adds reference sequence to the FASTA file. Will be named as "reference"
 ```
+
+## Building image
+
+The image `` was built with the following commands:
+
+```
+docker buildx create --name mybuilder
+docker buildx use mybuilder
+docker buildx build --platform=linux/arm64,linux/amd64 -t semenleyn/patric2fasta:latest --push .
+```

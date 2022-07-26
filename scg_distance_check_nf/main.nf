@@ -76,6 +76,7 @@ process TBL_TO_FASTA {
     container 'semenleyn/patric2fasta:latest'
     containerOptions '-v "$(pwd):/temp"'
     publishDir "${launchDir}/output/family_fasta/", mode: 'copy'
+    useMicromamba
 
     input:
         tuple val(gene), val(pgfam), val(atcc_sequence)
