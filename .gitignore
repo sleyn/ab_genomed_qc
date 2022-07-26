@@ -1,2 +1,5 @@
 .Rproj.user/
 output/
+.nextflow/
+.nextflow*
+work/

@@ -10,3 +10,5 @@ ARG MAMBA_DOCKERFILE_ACTIVATE=1
 WORKDIR /apps/
 COPY scripts/patric2fasta.py /apps
 ENV PATH=/apps:${PATH}
+
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh"]
