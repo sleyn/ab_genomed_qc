@@ -3,3 +3,4 @@ output/
 .nextflow/
 .nextflow*
 work/
+test/
