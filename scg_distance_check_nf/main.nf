@@ -73,8 +73,8 @@ process DOWNLOAD_FAMILY_MEMBER_TABLE {
  */
 
 process TBL_TO_FASTA {
-    container 'semenleyn/patric2fasta:latest'
-    containerOptions '-v "$(pwd):/temp"'
+    container 'semenleyn/ab-gen-qual-py-env:latest'
+    containerOptions '-v "$(pwd):/temp" -w "/temp"'
     publishDir "${launchDir}/output/family_fasta/", mode: 'copy'
 
     input:
@@ -86,9 +86,11 @@ process TBL_TO_FASTA {
 
     script:
     """
-    /opt/conda/bin/python3 /apps/patric2fasta.py -t /temp/${family_table} -o ${pgfam}.fasta --ref_sequence ${atcc_sequence}
+    patric2fasta.py -t /temp/${family_table} -o ${pgfam}.fasta --ref_sequence ${atcc_sequence}
     """
 }
+
+
 
 workflow {
     sc_gene_ch = Channel
