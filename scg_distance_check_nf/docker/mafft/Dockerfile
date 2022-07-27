@@ -7,18 +7,21 @@ LABEL description "MAFFT 5.05 aligner"
 WORKDIR /home
 
 RUN apt-get update \
-    && apt-get -y install make \
+    && apt-get -y install wget \
+                          make \
                           gcc \
+                          g++ \
     && apt-get clean \
     && apt-get purge \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY mafft-7.505-with-extensions /home/
-RUN cd mafft-7.505-with-extensions/core && \
+RUN wget https://mafft.cbrc.jp/alignment/software/mafft-7.505-with-extensions-src.tgz && \
+    tar -xvzf mafft-7.505-with-extensions-src.tgz && \
+    cd mafft-7.505-with-extensions/core && \
     make clean && \
     make && \
-    make install &&\
-    cd ..\extensions && \
+    make install && \
+    cd ../extensions && \
     make clean && \
     make && \
     make install
