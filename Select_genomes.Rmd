@@ -29,7 +29,7 @@ dist_matrix = dist.alignment(aln, 'identity')
 
 ```{r kmer distance_matrix}
 fasta = ape::read.FASTA(file = "data/Universal_genes/GyrA/PGF_03272313.fasta",type="AA")
-dend = kmer::cluster(fasta, 10)
+dend = kmer::cluster(fasta, 8)
 kmer_distances = ape::cophenetic.phylo(
   ape::as.phylo(dend)
   )

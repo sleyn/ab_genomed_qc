@@ -27,7 +27,7 @@ params.gene_table = "sc_genes.csv"
         tuple val(gene), val(pgfam), val(atcc_sequence)
     
     output:
-        path "${pgfam}_temp.family", emit: family_id_tbl_ch
+        tuple val(pgfam), path("${pgfam}_temp.family"), val(atcc_sequence), emit: family_id_tbl_ch
 
     script:
     """
@@ -52,11 +52,11 @@ process DOWNLOAD_FAMILY_MEMBER_TABLE {
     publishDir "${launchDir}/output/family_tables/", mode: 'copy'
 
     input:
-        tuple val(gene), val(pgfam), val(atcc_sequence)
-        path family_table_in
+        tuple val(pgfam), path(family_table_in), val(atcc_sequence)
     
     output:
-        path "${pgfam}.tsv", emit: family_table_ch
+        path "${pgfam}.tsv"
+        tuple val(pgfam), path("${pgfam}.tsv"), val(atcc_sequence), emit: family_table_ch
     
     script:
     """
@@ -78,11 +78,11 @@ process TBL_TO_FASTA {
     publishDir "${launchDir}/output/family_fasta/", mode: 'copy'
 
     input:
-        tuple val(gene), val(pgfam), val(atcc_sequence)
-        path family_table
+        tuple val(pgfam), path(family_table), val(atcc_sequence)
 
     output:
-        path "${pgfam}.fasta", emit: family_fasta_ch
+        path "${pgfam}.fasta"
+        tuple val(pgfam), path("${pgfam}.fasta"), emit: family_fasta_ch
 
     script:
     """
@@ -90,7 +90,52 @@ process TBL_TO_FASTA {
     """
 }
 
+/*
+ * STEP 4. Align fasta sequences
+ */
 
+process ALIGN_FASTA {
+    memory '4 GB'
+    container 'semenleyn/mafft:latest'
+    containerOptions '-v "$(pwd):/temp" -w "/temp"'
+    publishDir "${launchDir}/output/family_aln/", mode: 'copy'
+
+    input:
+        tuple val(pgfam), path(family_fasta)
+
+    output:
+        path "${pgfam}.aln"
+        tuple val(pgfam), path("${pgfam}.aln"), emit: family_aln_ch
+
+    script:
+    """
+    mafft --thread -1 /temp/${family_fasta} > ${pgfam}.aln
+    """
+}
+
+/*
+ * STEP 5. Calculate distance matrix
+ */
+
+process CALCULATE_DISTANCE {
+    memory '8 GB'
+    cpus 1
+    container 'semenleyn/ab-gen-qual-r-env:latest'
+    containerOptions '-v "$(pwd):/temp" -w "/temp"'
+    publishDir "${launchDir}/output/family_distance/", mode: 'copy'
+
+    input:
+        tuple val(pgfam), path(family_aln)
+
+    output:
+        path "${pgfam}.dist"
+        tuple val(pgfam), path("${pgfam}.dist"), emit: family_dist
+
+    script:
+    """
+    calculate_distances.R ${family_aln} ${pgfam}.dist
+    """
+}
 
 workflow {
     sc_gene_ch = Channel
@@ -100,14 +145,9 @@ workflow {
 
     
     EMIT_FAMILY(sc_gene_ch)
-    DOWNLOAD_FAMILY_MEMBER_TABLE(
-        sc_gene_ch,
-        EMIT_FAMILY.out.family_id_tbl_ch
-        )
-    TBL_TO_FASTA(
-        sc_gene_ch, 
-        DOWNLOAD_FAMILY_MEMBER_TABLE.out.family_table_ch
-        )
-//    ALIGN_FASTA()
-//    GENERATE_DISTANCE()
+    DOWNLOAD_FAMILY_MEMBER_TABLE(EMIT_FAMILY.out.family_id_tbl_ch)
+    TBL_TO_FASTA(DOWNLOAD_FAMILY_MEMBER_TABLE.out.family_table_ch)
+    ALIGN_FASTA(TBL_TO_FASTA.out.family_fasta_ch)
+    CALCULATE_DISTANCE(ALIGN_FASTA.out.family_aln_ch)
 }
+

@@ -4,3 +4,5 @@ output/
 .nextflow*
 work/
 test/
+.DS_Store
+.Rhistory
