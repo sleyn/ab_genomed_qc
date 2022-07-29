@@ -1,0 +1,20 @@
+FROM ubuntu:22.04
+
+LABEL author "Semion Leyn"
+LABEL email "semen.leyn@gmail.com"
+LABEL description "Setup R environment for A.baumannii genomes analysis"
+
+WORKDIR /home
+
+RUN apt-get update \
+    && apt-get -y install software-properties-common \
+    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 51716619E084DAB9 \
+    && add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/" \
+    && add-apt-repository universe \
+    && apt-get update \
+    && apt-get -y install r-base \
+    && apt-get clean \
+    && apt-get purge \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN R -e "install.packages(c('seqinr', 'tibble', 'dplyr', 'tidyr', 'readr', 'stringr'), dependencies=TRUE, repos='http://cran.rstudio.com/')"
