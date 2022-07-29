@@ -1,6 +1,6 @@
 # Python environment for scripts
 
-Environment is build based on official python docker image.
+Environment is build based on official ubuntu:20.04 docker image.
 Contains:
 
 - Biopython
