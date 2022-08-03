@@ -128,8 +128,7 @@ process CALCULATE_DISTANCE {
         tuple val(pgfam), path(family_aln)
 
     output:
-        path "${pgfam}.dist"
-        tuple path("${pgfam}.dist"), emit: family_dist
+        path "${pgfam}.dist" , emit: family_dist
 
     script:
     """
@@ -168,7 +167,6 @@ workflow {
                     .splitCsv(header: true)
                     .map { row -> tuple(row.Gene, row.PGFam, row.ATCC17978_sequence)}
 
-    
     EMIT_FAMILY(sc_gene_ch)
     DOWNLOAD_FAMILY_MEMBER_TABLE(EMIT_FAMILY.out.family_id_tbl_ch)
     TBL_TO_FASTA(DOWNLOAD_FAMILY_MEMBER_TABLE.out.family_table_ch)
