@@ -129,11 +129,36 @@ process CALCULATE_DISTANCE {
 
     output:
         path "${pgfam}.dist"
-        tuple val(pgfam), path("${pgfam}.dist"), emit: family_dist
+        tuple path("${pgfam}.dist"), emit: family_dist
 
     script:
     """
     calculate_distances.R ${family_aln} ${pgfam}.dist
+    """
+}
+
+/*
+ * STEP 6. Combine distances for each PGFam, convert them to P-values assuming normal 
+ * distribution of distances and filter by average p-value.
+ */
+
+process COMBINE_DISTANCES {
+    container 'semenleyn/ab-gen-qual-r-env:latest'
+    containerOptions '-v "$(pwd):/temp" -w "/temp"'
+    publishDir "${launchDir}/output/family_combined/", mode: 'copy'
+
+    input:
+        path "*"
+
+    output:
+        path "distance_combined.tsv"
+        path "distance_pvalue_combined.tsv"
+        path "dist_mean_vs_sd.pdf"
+        path "dist_pvalue.pdf"
+
+    script:
+    """
+    compare_distances.R . .
     """
 }
 
@@ -149,5 +174,6 @@ workflow {
     TBL_TO_FASTA(DOWNLOAD_FAMILY_MEMBER_TABLE.out.family_table_ch)
     ALIGN_FASTA(TBL_TO_FASTA.out.family_fasta_ch)
     CALCULATE_DISTANCE(ALIGN_FASTA.out.family_aln_ch)
+    COMBINE_DISTANCES(CALCULATE_DISTANCE.out.family_dist.collect())
 }
 
