@@ -43,7 +43,7 @@ dist_combined <- dist_combined %>% filter(nas <= quantile(dist_combined$nas, 0.7
 
 print('Plot mean vs sd counts')
 p_mean_sd <- dist_combined %>% ggplot(aes(mean, sd)) + 
-  stat_binhex(aes(fill = log(..count..))) +
+  geom_hex(aes(fill = log(..count..))) +
   xlab('Mean distance') +
   ylab('Mean standard deviation') +
   theme(legend.position = "none")
@@ -76,4 +76,4 @@ ggsave(file.path(args[2], 'dist_pvalue.pdf'), p_pvalue)
 
 print('Save distance and p-value tables.')
 dist_combined %>% write_tsv(file.path(args[2], 'distance_combined.tsv'))
-dist_combined_pvalue %>% filter(mean > 0.6) %>% write_tsv(file.path(args[2], 'distance_pvalue_combined.tsv'))
+dist_combined_pvalue %>% filter(mean <= 0.6) %>% write_tsv(file.path(args[2], 'distance_pvalue_combined.tsv'))

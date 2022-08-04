@@ -10,3 +10,4 @@ RUN dnf -y install R
 
 RUN R -e "install.packages(c('seqinr'), dependencies=TRUE, repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages(c('tidyverse'), dependencies=TRUE, repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages(c('hexbin'), dependencies=TRUE, repos='http://cran.rstudio.com/')"
